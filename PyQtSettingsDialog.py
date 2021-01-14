@@ -5,13 +5,32 @@ from typing import List, Any
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QSettings, QCoreApplication
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QLayout, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox
 
 from ui_files.ui_SettingsDialog import Ui_settings_dialog
 
 ORGANIZATION_NAME = 'hampusnasstrom'
 ORGANIZATION_DOMAIN = 'https://github.com/hampusnasstrom'
 APPLICATION_NAME = 'PyQtSettingsDialog'
+
+
+def clear_layout(layout: QLayout):
+    """
+    Help function for clearing PyQt layout
+    Adapted from comment by user3369214 on
+    https://stackoverflow.com/questions/4528347/clear-all-widgets-in-a-layout-in-pyqt
+
+    :param layout: Layout to be cleared
+    :type layout: QLayout
+    :return: None
+    """
+    if layout is not None:
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget() is not None:
+                child.widget().deleteLater()
+            elif child.layout() is not None:
+                clear_layout(child.layout())
 
 
 def get_nested(nested_dict: dict, keys: List[str]) -> Any:
@@ -83,7 +102,7 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         root_node = self._add_tree_item(root_node, self.settings)
         self.ui_tvi_settings_tree.setModel(tree_model)
         self.ui_tvi_settings_tree.expandAll()
-        self.ui_tvi_settings_tree.clicked.connect(self._get_value)
+        self.ui_tvi_settings_tree.clicked.connect(self._change_settings_view)
 
     def _add_tree_item(self, root_node, settings):
         for key in settings:
@@ -93,13 +112,42 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
                 root_node.appendRow(self._add_tree_item(item, settings[key]))
         return root_node
 
-    def _get_value(self, value):
+    def _change_settings_view(self, value):
         key = value
         keys = [value.data()]
         while key.parent().data() is not None:
             key = key.parent()
             keys.append(key.data())
-        self.ui_lbl_current_setting.setText(str(get_nested(self.settings, keys[::-1])))
+        clear_layout(self.ui_fla_settings_layout)
+        value = get_nested(self._settings_dict, keys[::-1])
+        title = ''
+        for key in keys[::-1]:
+            title += key + ' > '
+        self.ui_lbl_current_setting.setText(title)
+        if not isinstance(list(value.values())[0], dict):
+            for setting in value:
+                if isinstance(value[setting], bool):
+                    input_widget = QCheckBox()
+                    input_widget.setChecked(value[setting])
+                elif isinstance(value[setting], str):
+                    input_widget = QLineEdit()
+                    input_widget.setText(value[setting])
+                elif isinstance(value[setting], list):
+                    input_widget = QComboBox()
+                    input_widget.addItems(value[setting])
+                elif isinstance(value[setting], tuple):
+                    if isinstance(value[setting][0], int):
+                        input_widget = QSpinBox()
+                    elif isinstance(value[setting][0], float):
+                        input_widget = QDoubleSpinBox()
+                    else:
+                        raise TypeError
+                    input_widget.setValue(value[setting][0])
+                    input_widget.setMinimum(value[setting][1])
+                    input_widget.setMaximum(value[setting][2])
+                else:
+                    raise TypeError
+                self.ui_fla_settings_layout.addRow(QLabel(setting+":"), input_widget)
 
 
 if __name__ == '__main__':
