@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import List
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QSettings, QCoreApplication
@@ -10,6 +11,31 @@ from ui_files.ui_SettingsDialog import Ui_settings_dialog
 ORGANIZATION_NAME = 'hampusnasstrom'
 ORGANIZATION_DOMAIN = 'https://github.com/hampusnasstrom'
 APPLICATION_NAME = 'PyQtSettingsDialog'
+
+
+def get_nested(nested_dict: dict, keys: List[str]):
+    """
+    Help function for getting value from nested dict
+    Inspired by comment from Alex on https://www.haykranen.nl/2016/02/13/handling-complex-nested-dicts-in-python/
+
+    :param nested_dict: The nested dict from where to get the value
+    :type nested_dict: dict
+    :param keys: List of keys to reach the value from the top down
+    :type keys: List[str]
+    :return: The value for the last key
+    :rtype: any
+    """
+    if not isinstance(keys, list):
+        raise TypeError('expected type list for keys argument, got type %s' % type(keys))
+    elif not isinstance(nested_dict, dict):
+        raise TypeError('expected type dict for nested_dict argument, got type %s' % type(nested_dict))
+    elif len(keys) == 0:
+        raise AttributeError('keys list is empty')
+    else:
+        key = keys.pop(0)
+        if len(keys) == 0:
+            return nested_dict[key]
+        return get_nested(nested_dict[key], keys)
 
 
 class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
