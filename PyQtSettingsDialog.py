@@ -52,10 +52,11 @@ def get_nested(nested_dict: dict, keys: List[str]) -> Any:
     elif len(keys) == 0:
         raise AttributeError('keys list is empty')
     else:
-        key = keys.pop(0)
-        if len(keys) == 0:
+        _keys = keys.copy()
+        key = _keys.pop(0)
+        if len(_keys) == 0:
             return nested_dict[key]
-        return get_nested(nested_dict[key], keys)
+        return get_nested(nested_dict[key], _keys)
 
 
 class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
@@ -82,18 +83,22 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
 
     def _load_settings(self):
         settings = json.loads(self._q_settings.value(SettingsDialog.q_settings_key, '{}'))
-        if len(settings) == 0:
-            settings = self._select_default(self._settings_dict)
-            self._q_settings.setValue(SettingsDialog.q_settings_key, json.dumps(settings))
+        settings = self._select_default(self._settings_dict, settings)
+        self._q_settings.setValue(SettingsDialog.q_settings_key, json.dumps(settings))
         return settings
 
-    def _select_default(self, settings_dict: dict):
-        for key in settings_dict:
-            if isinstance(settings_dict[key], dict):
-                settings_dict[key] = self._select_default(settings_dict[key])
-            elif isinstance(settings_dict[key], list) or isinstance(settings_dict[key], tuple):
-                settings_dict[key] = settings_dict[key][0]
-        return settings_dict
+    def _select_default(self, settings_dict: dict, settings: dict):
+        return_dict = settings_dict.copy()
+        for key in return_dict:
+            if isinstance(return_dict[key], dict):
+                if key not in settings:
+                    settings[key] = {}
+                return_dict[key] = self._select_default(return_dict[key], settings[key])
+            elif key in settings and not isinstance(settings[key], dict):
+                return_dict[key] = settings[key]
+            elif isinstance(return_dict[key], list) or isinstance(return_dict[key], tuple):
+                return_dict[key] = return_dict[key][0]
+        return return_dict
 
     def _populate_tree(self):
         self.ui_tvi_settings_tree.setHeaderHidden(True)
@@ -174,7 +179,9 @@ if __name__ == '__main__':
             },
         'User':
             {
-                'Name': 'Hampus Näsström'
+                'Name': 'Hampus Näsström',
+                'Age': (27, 0, 120),
+                'Height [m]': (1.8, 0.0, 2.5)
             }
     }
 
