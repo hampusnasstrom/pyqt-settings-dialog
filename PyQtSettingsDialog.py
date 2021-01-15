@@ -3,7 +3,7 @@ import sys
 from typing import List, Any
 
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QSettings, QCoreApplication
+from PyQt5.QtCore import QSettings, QCoreApplication, QObject, pyqtSignal, QItemSelectionModel
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QLayout, QCheckBox, QComboBox, QSpinBox, QDoubleSpinBox
 
@@ -92,6 +92,10 @@ def set_nested(nested_dict: dict, keys: List[str], value: Any) -> dict:
             return _nested_dict
 
 
+class SettingsDialogSignals(QObject):
+    results_applied = pyqtSignal(list)
+
+
 class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
     """
     QDialog for graphical user interfacing with settings.
@@ -104,6 +108,8 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
 
         :param settings: QSettings from the application where settings should be applied
         :type settings: PyQt5.QtCore.QSettings
+        :param settings_dict: Dict with default values/ranges
+        :type settings_dict: dict
         :param parent: Parent widget
         :type parent: PyQt5.QtWidgets.QWidget
         """
@@ -113,7 +119,9 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         self._settings_dict = settings_dict.copy()
         self.settings = self._load_settings()
         self._unsaved_settings = self.settings.copy()
+        self._change_list = []
         self._populate_tree()
+        self.signals = SettingsDialogSignals()
 
     def _load_settings(self):
         settings = json.loads(self._q_settings.value(SettingsDialog.q_settings_key, '{}'))
@@ -140,8 +148,15 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         root_node = tree_model.invisibleRootItem()
         self._add_tree_item(root_node, self.settings)
         self.ui_tvi_settings_tree.setModel(tree_model)
-        self.ui_tvi_settings_tree.expandAll()
+        # self.ui_tvi_settings_tree.expandAll()
         self.ui_tvi_settings_tree.clicked.connect(self._change_settings_view)
+        item = tree_model.invisibleRootItem()
+        while item.hasChildren():
+            child = item.child(0, 0)
+            item = child
+        index = tree_model.indexFromItem(item)
+        self.ui_tvi_settings_tree.selectionModel().setCurrentIndex(index, QItemSelectionModel.Select)
+        self._change_settings_view(index)
 
     def _add_tree_item(self, root_node, settings):
         for key in settings:
@@ -152,42 +167,44 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         return root_node
 
     def _change_settings_view(self, value):
-        key = value
+        tree_view_item = value
         keys = [value.data()]
-        while key.parent().data() is not None:
-            key = key.parent()
-            keys.append(key.data())
+        while tree_view_item.parent().data() is not None:
+            tree_view_item = tree_view_item.parent()
+            keys.append(tree_view_item.data())
         clear_layout(self.ui_fla_settings_layout)
-        value = get_nested(self._settings_dict, keys[::-1])
+        value_ranges = get_nested(self._settings_dict, keys[::-1])
+        values = get_nested(self._unsaved_settings, keys[::-1])
         title = ''
         for key in keys[::-1]:
             title += key + ' > '
         title = title[:-3]  # Remove last arrow
         self.ui_lbl_current_setting.setText(title)
-        if not isinstance(list(value.values())[0], dict):
-            for setting in value:
-                if isinstance(value[setting], bool):
+        if not isinstance(list(value_ranges.values())[0], dict):  # Check if last node in tree
+            for setting in value_ranges:
+                if isinstance(value_ranges[setting], bool):
                     input_widget = QCheckBox()
-                    input_widget.setChecked(value[setting])
+                    input_widget.setChecked(values[setting])
                     input_widget.stateChanged.connect(self._value_changed)
-                elif isinstance(value[setting], str):
+                elif isinstance(value_ranges[setting], str):
                     input_widget = QLineEdit()
-                    input_widget.setText(value[setting])
+                    input_widget.setText(values[setting])
                     input_widget.textChanged.connect(self._value_changed)
-                elif isinstance(value[setting], list):
+                elif isinstance(value_ranges[setting], list):
                     input_widget = QComboBox()
-                    input_widget.addItems(value[setting])
+                    input_widget.addItems(value_ranges[setting])
+                    input_widget.setCurrentText(values[setting])
                     input_widget.currentTextChanged.connect(self._value_changed)
-                elif isinstance(value[setting], tuple):
-                    if isinstance(value[setting][0], int):
+                elif isinstance(value_ranges[setting], tuple):
+                    if isinstance(value_ranges[setting][0], int):
                         input_widget = QSpinBox()
-                    elif isinstance(value[setting][0], float):
+                    elif isinstance(value_ranges[setting][0], float):
                         input_widget = QDoubleSpinBox()
                     else:
                         raise TypeError
-                    input_widget.setValue(value[setting][0])
-                    input_widget.setMinimum(value[setting][1])
-                    input_widget.setMaximum(value[setting][2])
+                    input_widget.setValue(values[setting])
+                    input_widget.setMinimum(value_ranges[setting][1])
+                    input_widget.setMaximum(value_ranges[setting][2])
                     input_widget.valueChanged.connect(self._value_changed)
                 else:
                     raise TypeError
@@ -206,8 +223,20 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
             value = sender.text()
         elif isinstance(sender, (QSpinBox, QDoubleSpinBox)):
             value = sender.value()
-        self._unsaved_settings = set_nested(self.settings, keys, value)
-        print(self._unsaved_settings)
+        self._unsaved_settings = set_nested(self._unsaved_settings, keys, value)
+        self._change_list.append({'keys': keys, 'value': value})
+
+    def _apply_changes(self):
+        self.signals.results_applied.emit(self._change_list)  # TODO: Only emit final value for each key path
+        print('Emitted: ' + str(self._change_list))
+        self.settings = self._unsaved_settings.copy()
+        self._change_list = []
+        self._q_settings.setValue(self.q_settings_key, json.dumps(self.settings))
+
+    def reject(self) -> None:
+        self._unsaved_settings = self.settings.copy()
+        self._change_list = []
+        super().reject()
 
 
 if __name__ == '__main__':

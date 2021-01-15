@@ -36,6 +36,7 @@ class Ui_settings_dialog(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.ui_tvi_settings_tree.sizePolicy().hasHeightForWidth())
         self.ui_tvi_settings_tree.setSizePolicy(sizePolicy)
+        self.ui_tvi_settings_tree.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.ui_tvi_settings_tree.setObjectName("ui_tvi_settings_tree")
         self.verticalLayout.addWidget(self.ui_tvi_settings_tree)
         self.ui_sar_settings_area = QtWidgets.QScrollArea(self.splitter)
@@ -76,6 +77,7 @@ class Ui_settings_dialog(object):
         self.retranslateUi(settings_dialog)
         self.ui_dbo_dialog_button_box.accepted.connect(settings_dialog.accept)
         self.ui_dbo_dialog_button_box.rejected.connect(settings_dialog.reject)
+        self.ui_dbo_dialog_button_box.clicked['QAbstractButton*'].connect(settings_dialog._apply_changes)
         QtCore.QMetaObject.connectSlotsByName(settings_dialog)
 
     def retranslateUi(self, settings_dialog):

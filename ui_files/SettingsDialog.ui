@@ -50,6 +50,9 @@
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
         </widget>
        </item>
       </layout>
@@ -135,8 +138,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>248</x>
-     <y>254</y>
+     <x>257</x>
+     <y>305</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -151,8 +154,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>316</x>
-     <y>260</y>
+     <x>325</x>
+     <y>305</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>
@@ -160,5 +163,24 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>ui_dbo_dialog_button_box</sender>
+   <signal>clicked(QAbstractButton*)</signal>
+   <receiver>settings_dialog</receiver>
+   <slot>_apply_changes()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>388</x>
+     <y>294</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>347</x>
+     <y>279</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
+ <slots>
+  <slot>_apply_changes()</slot>
+ </slots>
 </ui>
