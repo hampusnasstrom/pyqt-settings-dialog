@@ -56,7 +56,40 @@ def get_nested(nested_dict: dict, keys: List[str]) -> Any:
         key = _keys.pop(0)
         if len(_keys) == 0:
             return nested_dict[key]
-        return get_nested(nested_dict[key], _keys)
+        else:
+            return get_nested(nested_dict[key], _keys)
+
+
+def set_nested(nested_dict: dict, keys: List[str], value: Any) -> dict:
+    """
+    Help function for setting value in nested dict
+    Inspired by comment from Alex on https://www.haykranen.nl/2016/02/13/handling-complex-nested-dicts-in-python/
+
+    :param nested_dict: The nested dict for which to set the value
+    :type nested_dict: dict
+    :param keys: List of keys to reach the value from the top down
+    :type keys: List[str]
+    :param value: Value to set
+    :type value: Any
+    :return: The dict populated with the new value.
+    :rtype: dict
+    """
+    if not isinstance(keys, list):
+        raise TypeError('expected type list for keys argument, got type %s' % type(keys))
+    elif not isinstance(nested_dict, dict):
+        raise TypeError('expected type dict for nested_dict argument, got type %s' % type(nested_dict))
+    elif len(keys) == 0:
+        raise AttributeError('keys list is empty')
+    else:
+        _nested_dict = nested_dict.copy()
+        _keys = keys.copy()
+        key = _keys.pop(0)
+        if len(_keys) == 0:
+            _nested_dict[key] = value
+            return _nested_dict
+        else:
+            _nested_dict[key] = set_nested(_nested_dict[key], _keys, value)
+            return _nested_dict
 
 
 class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
@@ -77,8 +110,9 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         super(SettingsDialog, self).__init__(parent)
         self.setupUi(self)
         self._q_settings = settings
-        self._settings_dict = settings_dict
+        self._settings_dict = settings_dict.copy()
         self.settings = self._load_settings()
+        self._unsaved_settings = self.settings.copy()
         self._populate_tree()
 
     def _load_settings(self):
@@ -104,7 +138,7 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         self.ui_tvi_settings_tree.setHeaderHidden(True)
         tree_model = QStandardItemModel()
         root_node = tree_model.invisibleRootItem()
-        root_node = self._add_tree_item(root_node, self.settings)
+        self._add_tree_item(root_node, self.settings)
         self.ui_tvi_settings_tree.setModel(tree_model)
         self.ui_tvi_settings_tree.expandAll()
         self.ui_tvi_settings_tree.clicked.connect(self._change_settings_view)
@@ -128,18 +162,22 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         title = ''
         for key in keys[::-1]:
             title += key + ' > '
+        title = title[:-3]  # Remove last arrow
         self.ui_lbl_current_setting.setText(title)
         if not isinstance(list(value.values())[0], dict):
             for setting in value:
                 if isinstance(value[setting], bool):
                     input_widget = QCheckBox()
                     input_widget.setChecked(value[setting])
+                    input_widget.stateChanged.connect(self._value_changed)
                 elif isinstance(value[setting], str):
                     input_widget = QLineEdit()
                     input_widget.setText(value[setting])
+                    input_widget.textChanged.connect(self._value_changed)
                 elif isinstance(value[setting], list):
                     input_widget = QComboBox()
                     input_widget.addItems(value[setting])
+                    input_widget.currentTextChanged.connect(self._value_changed)
                 elif isinstance(value[setting], tuple):
                     if isinstance(value[setting][0], int):
                         input_widget = QSpinBox()
@@ -150,9 +188,26 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
                     input_widget.setValue(value[setting][0])
                     input_widget.setMinimum(value[setting][1])
                     input_widget.setMaximum(value[setting][2])
+                    input_widget.valueChanged.connect(self._value_changed)
                 else:
                     raise TypeError
                 self.ui_fla_settings_layout.addRow(QLabel(setting+":"), input_widget)
+
+    def _value_changed(self):
+        sender = self.sender()
+        keys = self.ui_lbl_current_setting.text().split(' > ')
+        keys.append(self.ui_fla_settings_layout.labelForField(sender).text()[:-1])
+        value = None
+        if isinstance(sender, QCheckBox):
+            value = sender.isChecked()
+        elif isinstance(sender, QComboBox):
+            value = sender.currentText()
+        elif isinstance(sender, QLineEdit):
+            value = sender.text()
+        elif isinstance(sender, (QSpinBox, QDoubleSpinBox)):
+            value = sender.value()
+        self._unsaved_settings = set_nested(self.settings, keys, value)
+        print(self._unsaved_settings)
 
 
 if __name__ == '__main__':
