@@ -1,6 +1,6 @@
 import json
 import sys
-from typing import List, Any
+from typing import List, Any, Union
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QSettings, QCoreApplication, QObject, pyqtSignal, QItemSelectionModel
@@ -33,7 +33,7 @@ def clear_layout(layout: QLayout):
                 clear_layout(child.layout())
 
 
-def get_nested(nested_dict: dict, keys: List[str]) -> Any:
+def get_nested(nested_dict: dict, keys: List[str], default: Any = None) -> Any:
     """
     Help function for getting value from nested dict
     Inspired by comment from Alex on https://www.haykranen.nl/2016/02/13/handling-complex-nested-dicts-in-python/
@@ -42,6 +42,8 @@ def get_nested(nested_dict: dict, keys: List[str]) -> Any:
     :type nested_dict: dict
     :param keys: List of keys to reach the value from the top down
     :type keys: List[str]
+    :param default: Default value if subset of keys is not defined, if None any undefined key will raise KeyError.
+    :type default: Any
     :return: The value for the last key
     :rtype: Any
     """
@@ -54,6 +56,11 @@ def get_nested(nested_dict: dict, keys: List[str]) -> Any:
     else:
         _keys = keys.copy()
         key = _keys.pop(0)
+        if key not in nested_dict:
+            if default is None:
+                raise KeyError(key)
+            else:
+                return default
         if len(_keys) == 0:
             return nested_dict[key]
         else:
@@ -88,7 +95,7 @@ def set_nested(nested_dict: dict, keys: List[str], value: Any) -> dict:
             _nested_dict[key] = value
             return _nested_dict
         else:
-            _nested_dict[key] = set_nested(_nested_dict[key], _keys, value)
+            _nested_dict[key] = set_nested(_nested_dict.get(key, {}), _keys, value)
             return _nested_dict
 
 
@@ -123,6 +130,35 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         self._change_list_keys = []
         self._populate_tree()
         self.signals = SettingsDialogSignals()
+
+    def set(self, keys: List[str], value: Union[str, bool, int, float]) -> None:
+        """
+        Method for setting a setting value from code.
+
+        :param keys: List of keys to get to value to set
+        :type keys: List[str]
+        :param value: Value to set
+        :type value: Union[str, bool, int, float]
+        :return: None
+        :rtype: None
+        """
+        self.settings = set_nested(self.settings, keys, value)
+        self._unsaved_settings = self.settings.copy()
+        self._q_settings.setValue(self.q_settings_key, json.dumps(self.settings))
+        self._populate_tree()
+
+    def get(self, keys: List[str], default: Any = None) -> None:
+        """
+        Method for getting a setting value from code.
+
+        :param keys: List of keys to get the value for
+        :type keys: List[str]
+        :param default: Default value if subset of keys is not defined, if None any undefined key will raise KeyError.
+        :type default: Any
+        :return: None
+        :rtype: None
+        """
+        return get_nested(self.settings, keys, default)
 
     def _load_settings(self):
         settings = json.loads(self._q_settings.value(SettingsDialog.q_settings_key, '{}'))
@@ -232,7 +268,7 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
             self._change_list.append({'keys': keys, 'value': value})
 
     def _apply_changes(self):
-        self.signals.results_applied.emit(self._change_list)  # TODO: Only emit final value for each key path
+        self.signals.results_applied.emit(self._change_list)
         print('Emitted: ' + str(self._change_list))
         self.settings = self._unsaved_settings.copy()
         self._change_list = []
