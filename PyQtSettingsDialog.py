@@ -120,6 +120,7 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         self.settings = self._load_settings()
         self._unsaved_settings = self.settings.copy()
         self._change_list = []
+        self._change_list_keys = []
         self._populate_tree()
         self.signals = SettingsDialogSignals()
 
@@ -224,7 +225,11 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         elif isinstance(sender, (QSpinBox, QDoubleSpinBox)):
             value = sender.value()
         self._unsaved_settings = set_nested(self._unsaved_settings, keys, value)
-        self._change_list.append({'keys': keys, 'value': value})
+        if keys in self._change_list_keys:
+            self._change_list[self._change_list_keys.index(keys)] = {'keys': keys, 'value': value}
+        else:
+            self._change_list_keys.append(keys)
+            self._change_list.append({'keys': keys, 'value': value})
 
     def _apply_changes(self):
         self.signals.results_applied.emit(self._change_list)  # TODO: Only emit final value for each key path
