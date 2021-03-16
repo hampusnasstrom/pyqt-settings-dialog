@@ -150,7 +150,7 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         self._q_settings.setValue(self.q_settings_key, json.dumps(self.settings))
         self._populate_tree()
 
-    def get(self, keys: List[str], default: Any = None) -> None:
+    def get(self, keys: List[str], default: Any = None) -> Any:
         """
         Method for getting a setting value from code.
 
@@ -158,8 +158,8 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
         :type keys: List[str]
         :param default: Default value if subset of keys is not defined, if None any undefined key will raise KeyError.
         :type default: Any
-        :return: None
-        :rtype: None
+        :return: The value
+        :rtype: Any
         """
         return get_nested(self.settings, keys, default)
 
