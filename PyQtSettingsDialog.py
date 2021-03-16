@@ -109,20 +109,23 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
     """
     q_settings_key = "pyqt-settings-dialog-key"
 
-    def __init__(self, settings: QSettings, settings_dict: dict, parent: QWidget = None):
+    def __init__(self, settings: QSettings, settings_dict: Union[dict, str], parent=None):
         """
         Init method for SettingsDialog class.
 
         :param settings: QSettings from the application where settings should be applied
         :type settings: PyQt5.QtCore.QSettings
-        :param settings_dict: Dict with default values/ranges
-        :type settings_dict: dict
+        :param settings_dict: Dict with default values/ranges or path to json file with such dict
+        :type settings_dict: Union[dict, str]
         :param parent: Parent widget
-        :type parent: PyQt5.QtWidgets.QWidget
+        :type parent: Any
         """
         super(SettingsDialog, self).__init__(parent)
         self.setupUi(self)
         self._q_settings = settings
+        if isinstance(settings_dict, str):
+            with open(settings_dict, 'r') as json_file:
+                settings_dict = json.load(json_file)
         self._settings_dict = settings_dict.copy()
         self.settings = self._load_settings()
         self._unsaved_settings = self.settings.copy()
