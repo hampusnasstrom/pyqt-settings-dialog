@@ -271,11 +271,11 @@ class SettingsDialog(QtWidgets.QDialog, Ui_settings_dialog):
             self._change_list.append({'keys': keys, 'value': value})
 
     def _apply_changes(self):
+        self.settings = self._unsaved_settings.copy()
+        self._q_settings.setValue(self.q_settings_key, json.dumps(self.settings))
         self.signals.results_applied.emit(self._change_list)
         print('Emitted: ' + str(self._change_list))
-        self.settings = self._unsaved_settings.copy()
         self._change_list = []
-        self._q_settings.setValue(self.q_settings_key, json.dumps(self.settings))
 
     def reject(self) -> None:
         self._unsaved_settings = self.settings.copy()
